@@ -1,0 +1,27 @@
+rules_version = '2';
+// Og link-maker — deploy to the og-tag project:
+//   firebase use og-tag && firebase deploy --only firestore:rules
+// Public no-login tool: the publisher bundle + the edge click-counter
+// write without auth. Deletes are denied so old shares never break.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Deny Default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Slug counter (site_config/photo_seq) + any future site config.
+    match /site_config/{docId} {
+      allow read, write: if true;
+    }
+
+    // Per-photo short-links (photo_links/epN). Append-only.
+    match /photo_links/{slug} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;
+    }
+  }
+}

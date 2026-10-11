@@ -1,0 +1,6 @@
+# Og link-maker — static site, no build step.
+# Netlify publishes the repo root directly.
+# The /ep* edge function is declared in-file
+# (netlify/edge-functions/ep.js -> export const config).
+[build]
+  publish = "."

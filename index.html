@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Og Link Maker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+    <script src="/config.js"></script>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Og Link Maker</h1>
+      <p class="sub">
+        Paste a photo URL — it gets baked into a video-style thumbnail
+        (&#9654; play button + duration pill), uploaded to Cloudinary, and
+        published as its own short link (<span class="mono">/ep1</span>).
+        Each link keeps its own preview forever.
+      </p>
+
+      <section class="card">
+        <h2>1 &middot; Photo URL + duration</h2>
+        <label class="field-label" for="photoUrl">Photo link</label>
+        <div class="input-row">
+          <span class="icon">&#128279;</span>
+          <input
+            id="photoUrl"
+            type="url"
+            class="mono"
+            placeholder="https://cdn.site.com/photo.jpg"
+            autocomplete="off"
+          />
+        </div>
+        <div style="margin-top: 12px; max-width: 280px">
+          <label class="field-label" for="duration">Duration pill (auto-random)</label>
+          <div class="row">
+            <div class="grow input-row">
+              <span class="icon">&#9200;</span>
+              <input id="duration" type="text" class="mono" value="2:56" />
+            </div>
+            <button id="diceBtn" type="button" class="btn btn-ghost" title="Roll a new random duration">&#127922;</button>
+          </div>
+          <p id="durationHint" class="hint muted" style="display: none"></p>
+        </div>
+        <div style="margin-top: 16px">
+          <button id="bakeBtn" type="button" class="btn btn-accent">&#128247; Generate thumbnail (random pill)</button>
+        </div>
+        <p id="bakeError" class="hint err" style="display: none"></p>
+      </section>
+
+      <section class="card">
+        <h2>2 &middot; Preview + publish as new short link</h2>
+        <div id="previewEmpty" class="empty">No thumbnail yet — paste a URL above and hit Generate.</div>
+        <div id="previewWrap" style="display: none">
+          <div class="preview-box"><img id="previewImg" alt="Baked link preview with play button and duration" /></div>
+          <p class="hint muted">This exact image becomes that link's preview (Hot Video &#128139; / Click to watch now). Old links keep their own images — nothing is overwritten.</p>
+          <div style="margin-top: 12px">
+            <button id="publishBtn" type="button" class="btn btn-green">&#8681; Publish as new short link</button>
+          </div>
+          <p id="publishError" class="hint err" style="display: none"></p>
+          <div id="publishedBox" class="okbox" style="display: none">
+            <div class="shareline" style="margin-top: 0">
+              <code id="publishedUrl"></code>
+              <button id="publishedCopy" type="button" class="btn btn-ghost btn-sm">Copy link</button>
+            </div>
+            <p class="hint ok">Live with its own preview. Re-scrape in X Card Validator / @webpagebot to refresh their cache.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>3 &middot; All links <span id="linksCount" class="dim"></span></h2>
+        <p class="hint muted" style="margin-top: 0">Newest first. Each card shows its preview image — come back anytime and copy the URL again. Links are permanent (no delete).</p>
+        <div id="linksError" class="errbox" style="display: none">
+          <p class="t" id="linksErrorText"></p>
+          <p class="d">If this mentions Firestore rules, deploy <span class="mono">firestore.rules</span> to the <span class="mono">og-tag</span> project, then retry.</p>
+          <button id="linksRetry" type="button" class="btn btn-accent btn-sm" style="margin-top: 8px">Retry history</button>
+        </div>
+        <div id="justPublished" class="okbox" style="display: none; margin-top: 0; margin-bottom: 12px">
+          <p class="hint ok" style="margin: 0" id="justPublishedText"></p>
+          <div class="shareline"><button id="justPublishedCopy" type="button" class="btn btn-ghost btn-sm">Copy link</button></div>
+        </div>
+        <p id="linksEmpty" class="hint muted">Nothing published yet — your first link will appear here as /ep1.</p>
+        <div id="linksGrid" class="grid"></div>
+      </section>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
