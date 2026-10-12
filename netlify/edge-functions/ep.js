@@ -11,7 +11,7 @@
 // background so the redirect stays instant. No login anywhere.
 
 const BOT_RE =
-  /twitterbot|facebookexternalhit|facebookcatalog|facebot|linkedinbot|slackbot|telegrambot|whatsapp|discordbot|applebot|googlebot|bingbot|bytespider|embedly|quora link preview|showyoubot|outbrain|pinterest|tumblr/i;
+  /twitterbot|facebookexternalhit|facebookcatalog|facebot|linkedinbot|slackbot|telegrambot|whatsapp|discordbot|applebot|googlebot|bingbot|bytespider|embedly|quora link preview|showyoubot|outbrain|pinterest|tumblr|tiktok|snapchat|skype|iframely|pinterestbot|frog|developers\.google/i;
 
 const EP_PATH_RE = /^\/ep\d{1,6}\/?$/i;
 const EP_SLUG_RE = /^ep\d{1,6}$/;
@@ -79,6 +79,52 @@ async function bumpEpClicks(slug) {
                 { fieldPath: "lastClickedAt", setToServerValue: "REQUEST_TIME" },
                 { fieldPath: "updatedAt", setToServerValue: "REQUEST_TIME" },
               ],
+            },
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch {
+    // Analytics must never break the redirect.
+  }
+}
+
+// Fire-and-forget click event for the Analytics tab (humans only).
+// One lightweight doc per click: slug + server timestamp + UA + referrer.
+async function logClickEvent(req, slug) {
+  try {
+    let referrerHost = "";
+    let ua = "";
+    try {
+      ua = (req.headers && req.headers.get("user-agent")) || "";
+      const ref = (req.headers && req.headers.get("referer")) || (req.headers && req.headers.get("referrer")) || "";
+      if (ref && ref !== "Direct") {
+        try {
+          referrerHost = new URL(ref).hostname.toLowerCase();
+        } catch {
+          referrerHost = String(ref).slice(0, 120).toLowerCase();
+        }
+      }
+    } catch {
+      // ignore header parse errors
+    }
+    await fetch(commitUrl(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        writes: [
+          {
+            update: {
+              name:
+                "projects/" + PROJECT_ID + "/databases/(default)/documents/link_events/" +
+                slug + "_" + Date.now() + "_" + Math.floor(Math.random() * 1e6),
+              fields: {
+                slug: { stringValue: slug },
+                timestamp: { timestampValue: new Date().toISOString() },
+                userAgent: { stringValue: String(ua).slice(0, 300) },
+                referrerHost: { stringValue: String(referrerHost).slice(0, 120) },
+              },
             },
           },
         ],
@@ -185,22 +231,26 @@ export default async function handler(req, context) {
   const ua = (req.headers && req.headers.get("user-agent")) || "";
 
   // Bots: per-link OG HTML with that link's own Cloudinary image.
+  // Per-slug images are immutable -> long edge cache is safe.
   if (BOT_RE.test(ua)) {
     const imgUrl = await photoImageUrl(slug);
     return new Response(buildBotHtml(canonicalFor(req, slug), imgUrl), {
       status: 200,
       headers: {
         "Content-Type": "text/html;charset=UTF-8",
-        "Cache-Control": "public, max-age=60, s-maxage=300",
+        "Cache-Control": "public, max-age=3600, s-maxage=86400, immutable",
         Vary: "User-Agent",
       },
     });
   }
 
   // Humans: white "Opening..." page, ~1s, then off to the main site.
-  // Count the click in the background — never block the page.
+  // Count the click + log one event in the background — never block the page.
   try {
-    const bump = bumpEpClicks(slug);
+    const bump = (async () => {
+      await bumpEpClicks(slug);
+      await logClickEvent(req, slug);
+    })();
     if (context && typeof context.waitUntil === "function") context.waitUntil(bump);
     else bump.catch(() => {});
   } catch {

@@ -1,8 +1,8 @@
-rules_version = '2';
 // Og link-maker — deploy to the og-tag project:
 //   firebase use og-tag && firebase deploy --only firestore:rules
-// Public no-login tool: the publisher bundle + the edge click-counter
-// write without auth. Deletes are denied so old shares never break.
+// Public no-login tool: the dashboard bundle + the edge click-counter
+// write without auth. True delete is allowed (Manage tab) — deleted
+// /epN URLs stop working (bots get fallback, humans get ?from=missing).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -16,12 +16,20 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Per-photo short-links (photo_links/epN). Append-only.
+    // Per-photo short-links (photo_links/epN). Full CRUD for Manage tab.
     match /photo_links/{slug} {
       allow read: if true;
       allow create: if true;
       allow update: if true;
-      allow delete: if false;
+      allow delete: if true;
+    }
+
+    // Per-click events written by the edge function (humans only).
+    // Reads power the Analytics tab; creates come from edge; no updates.
+    match /link_events/{eventId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
     }
   }
 }
