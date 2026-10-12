@@ -75,6 +75,33 @@ export function subscribeToLinks(
   );
 }
 
+function mapEvent(id: string, data: Record<string, unknown>): OgLinkEvent {
+  const ua = typeof data.userAgent === 'string' ? data.userAgent : '';
+  const rawDevice = typeof data.deviceType === 'string' ? data.deviceType : '';
+  const deviceType =
+    rawDevice === 'Mobile' || rawDevice === 'Tablet' || rawDevice === 'Desktop'
+      ? rawDevice
+      : /ipad|tablet/i.test(ua)
+        ? 'Tablet'
+        : /mobile|android|iphone|ipod|phone/i.test(ua)
+          ? 'Mobile'
+          : 'Desktop';
+  return {
+    id,
+    slug: typeof data.slug === 'string' ? data.slug : '',
+    timestamp: (data.timestamp as OgLinkEvent['timestamp']) ?? null,
+    userAgent: ua,
+    deviceType,
+    referrerHost: typeof data.referrerHost === 'string' ? data.referrerHost : '',
+    referrer: typeof data.referrer === 'string' ? data.referrer : '',
+    utmSource: typeof data.utmSource === 'string' ? data.utmSource : '',
+    utmMedium: typeof data.utmMedium === 'string' ? data.utmMedium : '',
+    utmCampaign: typeof data.utmCampaign === 'string' ? data.utmCampaign : '',
+    country: typeof data.country === 'string' ? data.country.toUpperCase() : '',
+    countrySource: typeof data.countrySource === 'string' ? data.countrySource : 'unknown',
+  };
+}
+
 export function subscribeToRecentEvents(
   count: number,
   onData: (events: OgLinkEvent[]) => void,
@@ -83,19 +110,7 @@ export function subscribeToRecentEvents(
   const q = query(collection(db, LINK_EVENTS), orderBy('timestamp', 'desc'), limit(Math.max(1, Math.min(count, 100))));
   return onSnapshot(
     q,
-    (snap) =>
-      onData(
-        snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            slug: typeof data.slug === 'string' ? data.slug : '',
-            timestamp: (data.timestamp as OgLinkEvent['timestamp']) ?? null,
-            userAgent: typeof data.userAgent === 'string' ? data.userAgent : '',
-            referrerHost: typeof data.referrerHost === 'string' ? data.referrerHost : '',
-          };
-        }),
-      ),
+    (snap) => onData(snap.docs.map((d) => mapEvent(d.id, d.data()))),
     (err) => {
       console.warn('Firestore Notice: ', err instanceof Error ? err.message : String(err));
       if (onError) onError(err as Error);
@@ -116,16 +131,7 @@ export function subscribeToEventsInRange(
   return onSnapshot(
     q,
     (snap) => {
-      const rows: OgLinkEvent[] = snap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          slug: typeof data.slug === 'string' ? data.slug : '',
-          timestamp: (data.timestamp as OgLinkEvent['timestamp']) ?? null,
-          userAgent: typeof data.userAgent === 'string' ? data.userAgent : '',
-          referrerHost: typeof data.referrerHost === 'string' ? data.referrerHost : '',
-        };
-      });
+      const rows: OgLinkEvent[] = snap.docs.map((d) => mapEvent(d.id, d.data()));
       void startDate;
       void endDate;
       onData(rows);

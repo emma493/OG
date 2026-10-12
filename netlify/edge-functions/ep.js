@@ -91,24 +91,57 @@ async function bumpEpClicks(slug) {
 }
 
 // Fire-and-forget click event for the Analytics tab (humans only).
-// One lightweight doc per click: slug + server timestamp + UA + referrer.
-async function logClickEvent(req, slug) {
+// One lightweight doc per click: slug + server timestamp + UA + device +
+// referrer (host + full URL) + UTM passthrough + edge geo country.
+function deviceTypeFromUA(ua) {
+  const u = String(ua || "");
+  if (/ipad|tablet/i.test(u)) return "Tablet";
+  if (/mobile|android|iphone|ipod|phone/i.test(u)) return "Mobile";
+  return "Desktop";
+}
+
+async function logClickEvent(req, slug, context) {
   try {
     let referrerHost = "";
+    let referrer = "";
     let ua = "";
+    let utmSource = "";
+    let utmMedium = "";
+    let utmCampaign = "";
     try {
       ua = (req.headers && req.headers.get("user-agent")) || "";
       const ref = (req.headers && req.headers.get("referer")) || (req.headers && req.headers.get("referrer")) || "";
       if (ref && ref !== "Direct") {
+        referrer = String(ref).slice(0, 300);
         try {
           referrerHost = new URL(ref).hostname.toLowerCase();
         } catch {
           referrerHost = String(ref).slice(0, 120).toLowerCase();
         }
       }
+      try {
+        const incoming = new URL(req.url);
+        utmSource = String(incoming.searchParams.get("utm_source") || "").slice(0, 80);
+        utmMedium = String(incoming.searchParams.get("utm_medium") || "").slice(0, 80);
+        utmCampaign = String(incoming.searchParams.get("utm_campaign") || "").slice(0, 80);
+      } catch {
+        // ignore malformed query
+      }
     } catch {
       // ignore header parse errors
     }
+    let country = "";
+    let countrySource = "unknown";
+    try {
+      const code = context && context.geo && context.geo.country && context.geo.country.code;
+      if (code && String(code).length === 2) {
+        country = String(code).toUpperCase();
+        countrySource = "edge";
+      }
+    } catch {
+      // geo unavailable (local dev / some PoPs) — stays unknown
+    }
+    const deviceType = deviceTypeFromUA(ua);
     await fetch(commitUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -123,7 +156,14 @@ async function logClickEvent(req, slug) {
                 slug: { stringValue: slug },
                 timestamp: { timestampValue: new Date().toISOString() },
                 userAgent: { stringValue: String(ua).slice(0, 300) },
+                deviceType: { stringValue: deviceType },
                 referrerHost: { stringValue: String(referrerHost).slice(0, 120) },
+                referrer: { stringValue: String(referrer).slice(0, 300) },
+                utmSource: { stringValue: utmSource },
+                utmMedium: { stringValue: utmMedium },
+                utmCampaign: { stringValue: utmCampaign },
+                country: { stringValue: country },
+                countrySource: { stringValue: countrySource },
               },
             },
           },
@@ -249,7 +289,7 @@ export default async function handler(req, context) {
   try {
     const bump = (async () => {
       await bumpEpClicks(slug);
-      await logClickEvent(req, slug);
+      await logClickEvent(req, slug, context);
     })();
     if (context && typeof context.waitUntil === "function") context.waitUntil(bump);
     else bump.catch(() => {});

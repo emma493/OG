@@ -24,7 +24,14 @@ export interface OgLinkEvent {
   slug: string;
   timestamp: Timestamp | Date | number | null;
   userAgent: string;
+  deviceType: string; // Mobile | Tablet | Desktop (edge-parsed, '' on legacy docs)
   referrerHost: string;
+  referrer: string; // full referrer URL, truncated ('' when direct/legacy)
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+  country: string; // ISO-2 from edge geo ('' = unknown / legacy)
+  countrySource: string; // edge | unknown
 }
 
 export type DateRangePreset = 'today' | 'yesterday' | '7days' | '30days' | 'thisMonth' | 'all' | 'custom';
