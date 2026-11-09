@@ -242,39 +242,41 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-3 items-start">
-        <div className="rounded-[14px] p-5 grid gap-3 content-start min-w-0" style={surface}>
-          <h2 className="text-white text-[15px] font-bold">Referral sources</h2>
-          <p className="text-[#8A8B91] text-[12px]">{eventsInRange.length} clicks in range · host + UTM</p>
-          {refGroups.length === 0 ? (
-            <p className="text-[#8A8B91] text-[13px]">No referrer data in range yet.</p>
-          ) : (
-            refGroups.map((r) => (
-              <div key={r.host} className="grid gap-1.5 min-w-0">
-                <div className="flex items-center justify-between gap-2 text-[13px] min-w-0">
-                  <span className="text-white font-semibold truncate" title={r.host}>{r.host} <span className="text-[#8A8B91] font-normal">· {r.topUtm}</span></span>
-                  <span className="text-[#8A8B91] tabular-nums shrink-0">{r.views} · {r.pct.toFixed(0)}%</span>
-                </div>
-                <Bar pct={r.pct} color="#fbbf24" />
+      {/* Referral sources — full width row */}
+      <div className="mt-3 rounded-[14px] p-5 grid gap-3 content-start min-w-0" style={surface}>
+        <h2 className="text-white text-[15px] font-bold">Referral sources</h2>
+        <p className="text-[#8A8B91] text-[12px]">{eventsInRange.length} clicks in range · host + UTM</p>
+        {refGroups.length === 0 ? (
+          <p className="text-[#8A8B91] text-[13px]">No referrer data in range yet.</p>
+        ) : (
+          refGroups.map((r) => (
+            <div key={r.host} className="grid gap-1.5 min-w-0">
+              <div className="flex items-center justify-between gap-2 text-[13px] min-w-0">
+                <span className="text-white font-semibold truncate" title={r.host}>{r.host} <span className="text-[#8A8B91] font-normal">· {r.topUtm}</span></span>
+                <span className="text-[#8A8B91] tabular-nums shrink-0">{r.views} · {r.pct.toFixed(0)}%</span>
               </div>
-            ))
-          )}
-          <h3 className="text-white text-[13px] font-bold mt-1">UTM campaigns</h3>
-          {topUtms.length === 0 ? (
-            <p className="text-[#8A8B91] text-[12px]">No UTM-tagged clicks in range. Try <span className="text-white">?utm_source=tiktok&amp;utm_medium=social&amp;utm_campaign=launch</span></p>
-          ) : (
-            topUtms.map((u) => (
-              <div key={`${u.source}|${u.medium}|${u.campaign}`} className="grid gap-1.5 min-w-0">
-                <div className="flex items-center justify-between gap-2 text-[13px] min-w-0">
-                  <span className="text-white font-semibold truncate" title={`${u.source} / ${u.medium} / ${u.campaign}`}>{u.source} <span className="text-[#8A8B91] font-normal">· {u.medium} · {u.campaign}</span></span>
-                  <span className="text-[#8A8B91] tabular-nums shrink-0">{u.views}</span>
-                </div>
-                <Bar pct={(u.views / maxUtmViews) * 100} color="#a78bfa" />
+              <Bar pct={r.pct} color="#fbbf24" />
+            </div>
+          ))
+        )}
+        <h3 className="text-white text-[13px] font-bold mt-1">UTM campaigns</h3>
+        {topUtms.length === 0 ? (
+          <p className="text-[#8A8B91] text-[12px]">No UTM-tagged clicks in range. Try <span className="text-white">?utm_source=tiktok&amp;utm_medium=social&amp;utm_campaign=launch</span></p>
+        ) : (
+          topUtms.map((u) => (
+            <div key={`${u.source}|${u.medium}|${u.campaign}`} className="grid gap-1.5 min-w-0">
+              <div className="flex items-center justify-between gap-2 text-[13px] min-w-0">
+                <span className="text-white font-semibold truncate" title={`${u.source} / ${u.medium} / ${u.campaign}`}>{u.source} <span className="text-[#8A8B91] font-normal">· {u.medium} · {u.campaign}</span></span>
+                <span className="text-[#8A8B91] tabular-nums shrink-0">{u.views}</span>
               </div>
-            ))
-          )}
-        </div>
+              <Bar pct={(u.views / maxUtmViews) * 100} color="#a78bfa" />
+            </div>
+          ))
+        )}
+      </div>
 
+      {/* Devices + Countries side by side */}
+      <div className="mt-3 grid gap-3 lg:grid-cols-2 items-start">
         <div className="rounded-[14px] p-5 grid gap-3 content-start min-w-0" style={surface}>
           <h2 className="text-white text-[15px] font-bold">Devices</h2>
           {deviceTotal === 0 ? (
