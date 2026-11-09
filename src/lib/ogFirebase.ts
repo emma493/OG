@@ -9,14 +9,12 @@ import {
   collection,
   deleteDoc,
   doc,
-  getDoc,
   limit,
   onSnapshot,
   orderBy,
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   setLogLevel,
   updateDoc,
   where,
@@ -64,7 +62,7 @@ export function subscribeToLinks(
   onData: (links: OgLinkDocument[]) => void,
   onError?: (err: Error) => void,
 ) {
-  const q = query(collection(db, PHOTO_LINKS), orderBy('createdAt', 'desc'), limit(200));
+  const q = query(collection(db, PHOTO_LINKS), orderBy('createdAt', 'desc'), limit(1000));
   return onSnapshot(
     q,
     (snap) => onData(snap.docs.map((d) => mapLink(d.id, d.data()))),
@@ -172,14 +170,17 @@ export async function mintLink(input: MintLinkInput): Promise<string> {
       tx.set(seqRef, { next: n + 1, updatedAt: serverTimestamp() }, { merge: true });
       return n;
     });
-    // Probe forward a few slots in case of races / manual docs.
+    // Probe forward a few slots in case of races / manual docs. Each claim is
+    // an atomic create-if-absent, so two publishers can never overwrite the
+    // same /epN. Real errors (permission-denied, network) propagate instead
+    // of being swallowed as "allocator is stuck".
     for (let a = 0; a < 5; a += 1) {
       const slug = `ep${next + a}`;
       const ref = doc(db, PHOTO_LINKS, slug);
-      const existing = await getDoc(ref);
-      if (existing.exists()) continue;
-      try {
-        await setDoc(ref, {
+      const claimed = await runTransaction(db, async (tx) => {
+        const existing = await tx.get(ref);
+        if (existing.exists()) return false;
+        tx.set(ref, {
           slug,
           sourceUrl: input.sourceUrl.trim(),
           imageUrl: input.imageUrl,
@@ -194,12 +195,9 @@ export async function mintLink(input: MintLinkInput): Promise<string> {
           updatedAt: serverTimestamp(),
           lastClickedAt: null,
         });
-        return slug;
-      } catch (e) {
-        // Lost a race — try next candidate.
-        void e;
-        continue;
-      }
+        return true;
+      });
+      if (claimed) return slug;
     }
   }
   throw new Error('Slug allocator is stuck — try again.');

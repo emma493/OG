@@ -10,8 +10,11 @@
 // shortxx.live/?from=epN after ~1 second. Clicks are counted in the
 // background so the redirect stays instant. No login anywhere.
 
+// Crawler-specific tokens ONLY. Generic app names (tiktok, snapchat, pinterest,
+// skype, tumblr...) also appear in the in-app browser UA of real humans, which
+// made them look like bots: no redirect, no click counted -> views stuck at 0.
 const BOT_RE =
-  /twitterbot|facebookexternalhit|facebookcatalog|facebot|linkedinbot|slackbot|telegrambot|whatsapp|discordbot|applebot|googlebot|bingbot|bytespider|embedly|quora link preview|showyoubot|outbrain|pinterest|tumblr|tiktok|snapchat|skype|iframely|pinterestbot|frog|developers\.google/i;
+  /twitterbot|facebookexternalhit|facebookcatalog|facebot|linkedinbot|slackbot|slack-imgproxy|telegrambot|whatsapp|discordbot|applebot|googlebot|google-inspectiontool|bingbot|bytespider|tiktokspider|embedly|quora link preview|showyoubot|outbrain|pinterestbot|pinterest\/0|tumblr\/|skypeuripreview|snap url preview|iframely|developers\.google/i;
 
 const EP_PATH_RE = /^\/ep\d{1,6}\/?$/i;
 const EP_SLUG_RE = /^ep\d{1,6}$/;
@@ -56,24 +59,21 @@ async function photoImageUrl(slug) {
   }
 }
 
-// Fire-and-forget clicks bump. Verifies the doc exists first so stray
-// /ep999999 hits never create ghost docs via updateTransforms.
+// Clicks bump (runs in waitUntil). One atomic commit with an `exists: true`
+// precondition: stray /ep999999 hits 404 instead of creating ghost docs, and
+// no extra GET round-trip. The response is CHECKED and logged — before, a
+// 400/403 from Firestore (bad key restrictions, rules) was silently ignored.
 async function bumpEpClicks(slug) {
   try {
-    const check = await fetch(photoDocUrl(slug), {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!check.ok) return;
     const docName =
       "projects/" + PROJECT_ID + "/databases/(default)/documents/photo_links/" + slug;
-    await fetch(commitUrl(), {
+    const res = await fetch(commitUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         writes: [
           {
-            updateTransforms: {
+            transform: {
               document: docName,
               fieldTransforms: [
                 { fieldPath: "clicks", increment: { integerValue: "1" } },
@@ -81,11 +81,24 @@ async function bumpEpClicks(slug) {
                 { fieldPath: "updatedAt", setToServerValue: "REQUEST_TIME" },
               ],
             },
+            currentDocument: { exists: true },
           },
         ],
       }),
       signal: AbortSignal.timeout(4000),
     });
+    if (!res.ok) {
+      let detail = "";
+      try {
+        detail = (await res.text()).slice(0, 300);
+      } catch {
+        // ignore
+      }
+      // 404/FAILED_PRECONDITION = deleted or unknown slug: expected, stay quiet.
+      if (res.status !== 404 && !/NOT_FOUND|FAILED_PRECONDITION/.test(detail)) {
+        console.error("[ep] bumpEpClicks HTTP " + res.status + " for " + slug + ": " + detail);
+      }
+    }
   } catch (e) {
     console.error("[ep] bumpEpClicks failed:", e);
     // Analytics must never break the redirect.
@@ -144,7 +157,7 @@ async function logClickEvent(req, slug, context) {
       // geo unavailable (local dev / some PoPs) — stays unknown
     }
     const deviceType = deviceTypeFromUA(ua);
-    await fetch(commitUrl(), {
+    const evRes = await fetch(commitUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -173,6 +186,15 @@ async function logClickEvent(req, slug, context) {
       }),
       signal: AbortSignal.timeout(4000),
     });
+    if (!evRes.ok) {
+      let detail = "";
+      try {
+        detail = (await evRes.text()).slice(0, 300);
+      } catch {
+        // ignore
+      }
+      console.error("[ep] logClickEvent HTTP " + evRes.status + ": " + detail);
+    }
   } catch (e) {
     console.error("[ep] logClickEvent failed:", e);
     // Analytics must never break the redirect.
@@ -265,7 +287,8 @@ export default async function handler(req, context) {
   } catch {
     return context.next();
   }
-  if (req.method !== "GET" || !EP_PATH_RE.test(url.pathname)) {
+  const isHead = req.method === "HEAD";
+  if ((req.method !== "GET" && !isHead) || !EP_PATH_RE.test(url.pathname)) {
     return context.next();
   }
   const slug = url.pathname.replace(/\//g, "").toLowerCase();
@@ -277,23 +300,32 @@ export default async function handler(req, context) {
   // Per-slug images are immutable -> long edge cache is safe.
   if (BOT_RE.test(ua)) {
     const imgUrl = await photoImageUrl(slug);
-    return new Response(buildBotHtml(canonicalFor(req, slug), imgUrl), {
+    return new Response(isHead ? null : buildBotHtml(canonicalFor(req, slug), imgUrl), {
       status: 200,
       headers: {
         "Content-Type": "text/html;charset=UTF-8",
-        "Cache-Control": "public, max-age=3600, s-maxage=86400, immutable",
+        // NEVER let the shared CDN cache this: Netlify's CDN does not vary on
+        // User-Agent, so a cached bot page (blank body, no redirect, no click
+        // count) would be served to every human for the cache lifetime.
+        "Cache-Control": "no-store",
+        "Netlify-CDN-Cache-Control": "no-store",
         Vary: "User-Agent",
       },
+    });
+  }
+
+  // HEAD from non-bots: never counts as a click.
+  if (isHead) {
+    return new Response(null, {
+      status: 200,
+      headers: { "Content-Type": "text/html;charset=UTF-8", "Cache-Control": "no-store" },
     });
   }
 
   // Humans: white "Opening..." page, ~1s, then off to the main site.
   // Count the click + log one event in the background — never block the page.
   try {
-    const bump = (async () => {
-      await bumpEpClicks(slug);
-      await logClickEvent(req, slug, context);
-    })();
+    const bump = Promise.allSettled([bumpEpClicks(slug), logClickEvent(req, slug, context)]);
     if (context && typeof context.waitUntil === "function") context.waitUntil(bump);
     else bump.catch(() => {});
   } catch (e) {
@@ -306,6 +338,7 @@ export default async function handler(req, context) {
     headers: {
       "Content-Type": "text/html;charset=UTF-8",
       "Cache-Control": "no-store",
+      "Netlify-CDN-Cache-Control": "no-store",
       Vary: "User-Agent",
     },
   });
