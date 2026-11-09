@@ -50,7 +50,8 @@ async function photoImageUrl(slug) {
     const doc = await res.json();
     const u = (doc && doc.fields && doc.fields.imageUrl && doc.fields.imageUrl.stringValue) || "";
     return /^https:\/\/res\.cloudinary\.com\//.test(u.trim()) ? u.trim() : FALLBACK_IMG;
-  } catch {
+  } catch (e) {
+    console.error("[ep] photoImageUrl failed:", e);
     return FALLBACK_IMG;
   }
 }
@@ -85,7 +86,8 @@ async function bumpEpClicks(slug) {
       }),
       signal: AbortSignal.timeout(4000),
     });
-  } catch {
+  } catch (e) {
+    console.error("[ep] bumpEpClicks failed:", e);
     // Analytics must never break the redirect.
   }
 }
@@ -171,7 +173,8 @@ async function logClickEvent(req, slug, context) {
       }),
       signal: AbortSignal.timeout(4000),
     });
-  } catch {
+  } catch (e) {
+    console.error("[ep] logClickEvent failed:", e);
     // Analytics must never break the redirect.
   }
 }
@@ -293,7 +296,8 @@ export default async function handler(req, context) {
     })();
     if (context && typeof context.waitUntil === "function") context.waitUntil(bump);
     else bump.catch(() => {});
-  } catch {
+  } catch (e) {
+    console.error("[ep] analytics wrapper failed:", e);
     // never break the page on analytics
   }
   const dest = redirectTarget(req, slug);
