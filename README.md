@@ -6,7 +6,7 @@ random duration pill) → Cloudinary → short links `/ep1`, `/ep2`, …
 Each link keeps its own preview forever.
 
 - ** humans**: `GET /epN` → white "Opening..." page → redirect after ~1s to
-  `https://shortxx.live/?from=epN` (click counted in the background).
+  `https://gerbonmovies.site/?from=epN` (click counted in the background).
 - **Bots** (X / WhatsApp / Telegram …): same URL returns OG HTML with that
   link's own Cloudinary image + `Hot Video 💋 / Click to watch now`.
 
@@ -69,7 +69,7 @@ Each link keeps its own preview forever.
 - All Links: search/sort/filter finds them; Dashboard totals match.
 - `curl -A Twitterbot https://<site>/epN | grep og:image` → that link's
   Cloudinary URL (different per link).
-- Human visit → white "Opening..." ~1s → `https://shortxx.live/?from=epN`,
+- Human visit → white "Opening..." ~1s → `https://gerbonmovies.site/?from=epN`,
   clicks +1, event row in Analytics → Live activity.
 - Manage: Hide/Show toggles badge; Delete removes doc (shares 404 by design).
-- Old `shortxx.live/epN` links (shortxx-app project) are unaffected.
+- Old `gerbonmovies.site/epN` links (shortxx-app project) are unaffected.

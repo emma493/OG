@@ -7,7 +7,7 @@
 // themselves — no version param needed.
 //
 // Humans get a plain white page showing "Opening..." that redirects to
-// shortxx.live/?from=epN after ~1 second. Clicks are counted in the
+// gerbonmovies.site/?from=epN after ~1 second. Clicks are counted in the
 // background so the redirect stays instant. No login anywhere.
 
 // Crawler-specific tokens ONLY. Generic app names (tiktok, snapchat, pinterest,
@@ -21,7 +21,7 @@ const EP_SLUG_RE = /^ep\d{1,6}$/;
 
 const EP_TITLE = "Hot Video \uD83D\uDC8B";
 const EP_DESC = "Click to watch now";
-const MAIN_SITE = "https://shortxx.live";
+const MAIN_SITE = "https://gerbonmovies.site";
 
 const PROJECT_ID = "og-tag";
 // Public browser key (same as the publisher bundle). Rules-gated, not secret.
