@@ -9,7 +9,7 @@ import { friendlyReason } from '../lib/utils';
 const surface = { background: '#1E1F27', border: '1px solid rgba(255,255,255,0.08)' };
 const inputStyle = { background: '#16171D', border: '1px solid rgba(255,255,255,0.1)' };
 
-interface Published { sourceUrl: string; slug: string; url: string; duration: string; }
+interface Published { sourceUrl: string; slug: string; url: string; duration: string; imageUrl: string; }
 interface Failed { url: string; reason: string; }
 
 export default function AddLinksPage() {
@@ -54,7 +54,7 @@ export default function AddLinksPage() {
             });
             const up = await uploadBakedImage(baked);
             const slug = await mintLink({ sourceUrl, imageUrl: up.secureUrl, publicId: up.publicId, duration });
-            ok.push({ sourceUrl, slug, url: shareUrlFor(slug), duration });
+            ok.push({ sourceUrl, slug, url: shareUrlFor(slug), duration, imageUrl: up.secureUrl });
           } catch (e) {
             errs.push({ url: sourceUrl, reason: friendlyReason(e) });
           }
@@ -128,9 +128,18 @@ export default function AddLinksPage() {
           <section className="rounded-[14px] p-5 grid gap-2" style={surface}>
             <h2 className="text-white text-[14px] font-bold">Published</h2>
             {published.map((p) => (
-              <div key={p.slug} className="flex items-center gap-2 text-[13px] min-w-0 rounded-[10px] px-3 py-2" style={inputStyle}>
-                <span className="text-white font-mono font-bold truncate flex-1 min-w-0" title={p.url}>{p.url}</span>
-                <span className="text-[#8A8B91] font-mono text-[12px] shrink-0">{p.duration}</span>
+              <div key={p.slug} className="flex items-start gap-2 text-[13px] min-w-0 rounded-[10px] px-3 py-2" style={inputStyle}>
+                {p.imageUrl && (
+                  <img
+                    src={p.imageUrl}
+                    alt={`Preview for ${p.slug}`}
+                    className="w-16 h-10 rounded-[6px] object-cover shrink-0"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <span className="text-white font-mono font-bold truncate block" title={p.url}>{p.url}</span>
+                  <span className="text-[#8A8B91] font-mono text-[11px]">{p.duration}</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => navigator.clipboard?.writeText(p.url).then(() => setToast(`Copied ${p.slug}`))}
